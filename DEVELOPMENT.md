@@ -88,13 +88,13 @@ Build for different architectures without any runtime dependencies:
 
 ```sh
 # Linux AMD64 (most VPS / servers)
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o picobot ./cmd/picobot
+GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o picobot_linux_amd64 ./cmd/picobot
 
 # Linux ARM64 (Raspberry Pi, ARM servers)
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o picobot ./cmd/picobot
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o picobot_linux_arm64 ./cmd/picobot
 
 # macOS ARM64 (Apple Silicon)
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o picobot ./cmd/picobot
+GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o picobot_mac_arm64 ./cmd/picobot
 ```
 
 The `-ldflags="-s -w"` flags strip debug symbols, keeping the binary at ~11MB.
