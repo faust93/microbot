@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/inbucket/html2text"
 )
 
 // WebTool supports fetch operations.
@@ -48,5 +50,10 @@ func (t *WebTool) Execute(ctx context.Context, args map[string]interface{}) (str
 	if err != nil {
 		return "", err
 	}
-	return string(b), nil
+
+	text, err := html2text.FromString(string(b), html2text.Options{PrettyTables: true})
+	if err != nil {
+		return "", err
+	}
+	return text, nil
 }
