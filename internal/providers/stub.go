@@ -10,7 +10,7 @@ type StubProvider struct{}
 
 func NewStubProvider() *StubProvider { return &StubProvider{} }
 
-func (p *StubProvider) Chat(ctx context.Context, messages []Message, tools []ToolDefinition, model string) (LLMResponse, error) {
+func (p *StubProvider) Chat(ctx context.Context, messages []Message, tools []ToolDefinition, model string, temperature float64, maxTokens int) (LLMResponse, error) {
 	// Find last user message
 	last := ""
 	for i := len(messages) - 1; i >= 0; i-- {

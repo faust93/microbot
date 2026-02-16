@@ -34,7 +34,7 @@ type LLMResponse struct {
 // LLMProvider is the interface used by the agent loop to call LLMs.
 type LLMProvider interface {
 	// Chat sends messages to the model and returns a normalized response.
-	Chat(ctx context.Context, messages []Message, tools []ToolDefinition, model string) (LLMResponse, error)
+	Chat(ctx context.Context, messages []Message, tools []ToolDefinition, model string, temperature float64, maxTokens int) (LLMResponse, error)
 
 	// GetDefaultModel returns the provider's default model string.
 	GetDefaultModel() string

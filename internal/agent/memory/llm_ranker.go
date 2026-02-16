@@ -15,21 +15,23 @@ import (
 type LLMMemoryRanker struct {
 	provider providers.LLMProvider
 	model    string
+        Temperature float64       `json:"temperature"`
+        maxTokens   int           `json:"max_tokens"`
 	fallback *SimpleRanker
 	logger   *log.Logger // optional per-instance logger for diagnostics
 }
 
 // NewLLMRanker constructs an LLMMemoryRanker using the given provider and model.
-func NewLLMRanker(provider providers.LLMProvider, model string) *LLMMemoryRanker {
-	return NewLLMRankerWithLogger(provider, model, nil)
+func NewLLMRanker(provider providers.LLMProvider, model string, temp float64, maxTokens int) *LLMMemoryRanker {
+	return NewLLMRankerWithLogger(provider, model, temp, maxTokens, nil)
 }
 
 // NewLLMRankerWithLogger constructs an LLMMemoryRanker with an optional logger.
-func NewLLMRankerWithLogger(provider providers.LLMProvider, model string, logger *log.Logger) *LLMMemoryRanker {
+func NewLLMRankerWithLogger(provider providers.LLMProvider, model string, temp float64, maxTokens int, logger *log.Logger) *LLMMemoryRanker {
 	if model == "" && provider != nil {
 		model = provider.GetDefaultModel()
 	}
-	return &LLMMemoryRanker{provider: provider, model: model, fallback: NewSimpleRanker(), logger: logger}
+	return &LLMMemoryRanker{provider: provider, model: model, Temperature: temp, maxTokens: maxTokens, fallback: NewSimpleRanker(), logger: logger}
 }
 
 // logf logs using the instance logger if present, else falls back to package log.
@@ -77,7 +79,7 @@ func (r *LLMMemoryRanker) Rank(query string, memories []MemoryItem, top int) []M
 	}
 	// diagnostic log
 	r.logf("LLMMemoryRanker: sending ranking request for query=%q with %d memories", query, len(memories))
-	resp, err := r.provider.Chat(context.Background(), messages, []providers.ToolDefinition{rankTool}, r.model)
+	resp, err := r.provider.Chat(context.Background(), messages, []providers.ToolDefinition{rankTool}, r.model, r.Temperature, r.maxTokens)
 	if err != nil {
 		r.logf("LLMMemoryRanker provider error: %v", err)
 		return r.fallback.Rank(query, memories, top)

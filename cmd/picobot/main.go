@@ -87,7 +87,7 @@ func NewRootCmd() *cobra.Command {
 			if maxIter <= 0 {
 				maxIter = 100
 			}
-			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Workspace, nil)
+			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Temperature, cfg.Agents.Defaults.MaxTokens, cfg.Agents.Defaults.Workspace, nil)
 
 			resp, err := ag.ProcessDirect(msg, time.Duration(cfg.Providers.OpenAI.Timeout)*time.Second)
 			if err != nil {
@@ -134,7 +134,7 @@ func NewRootCmd() *cobra.Command {
 			if maxIter <= 0 {
 				maxIter = 100
 			}
-			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Workspace, scheduler)
+			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Temperature, cfg.Agents.Defaults.MaxTokens, cfg.Agents.Defaults.Workspace, scheduler)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -360,7 +360,7 @@ func NewRootCmd() *cobra.Command {
 			if verbose {
 				logger = log.New(cmd.OutOrStdout(), "ranker: ", 0)
 			}
-			ranker := memory.NewLLMRankerWithLogger(provider, provider.GetDefaultModel(), logger)
+			ranker := memory.NewLLMRankerWithLogger(provider, provider.GetDefaultModel(), 0.5, 32768, logger)
 			res := ranker.Rank(q, items, top)
 			for i, m := range res {
 				fmt.Fprintf(cmd.OutOrStdout(), "%d: %s (%s)\n", i+1, m.Text, m.Kind)

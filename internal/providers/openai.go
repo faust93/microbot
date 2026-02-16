@@ -36,9 +36,12 @@ func (p *OpenAIProvider) GetDefaultModel() string { return "gpt-4o-mini" }
 
 // Request/response shapes using the modern OpenAI "tools" format.
 type chatRequest struct {
-	Model    string        `json:"model"`
-	Messages []messageJSON `json:"messages"`
-	Tools    []toolWrapper `json:"tools,omitempty"`
+	Model       string        `json:"model"`
+	Messages    []messageJSON `json:"messages"`
+	Temperature float64       `json:"temperature"`
+	MaxTokens   int           `json:"max_tokens"`
+	ToolChoice  string        `json:"tool_choice"`
+	Tools       []toolWrapper `json:"tools,omitempty"`
 }
 
 // toolWrapper is the OpenAI tools array element: {"type": "function", "function": {...}}
@@ -84,7 +87,7 @@ type chatResponse struct {
 }
 
 // Chat calls an OpenAI-compatible chat completion endpoint and returns a simplified response.
-func (p *OpenAIProvider) Chat(ctx context.Context, messages []Message, tools []ToolDefinition, model string) (LLMResponse, error) {
+func (p *OpenAIProvider) Chat(ctx context.Context, messages []Message, tools []ToolDefinition, model string, temperature float64, maxTokens int) (LLMResponse, error) {
 	if p.APIKey == "" {
 		return LLMResponse{}, errors.New("OpenAI provider: API key is not configured")
 	}
@@ -92,12 +95,15 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []Message, tools []T
 		model = p.GetDefaultModel()
 	}
 
-	reqBody := chatRequest{Model: model, Messages: make([]messageJSON, 0, len(messages))}
+	reqBody := chatRequest{Model: model, Messages: make([]messageJSON, 0, len(messages)), Temperature: temperature, MaxTokens: maxTokens, ToolChoice: "auto"}
 	for _, m := range messages {
 		mj := messageJSON{Role: m.Role, Content: m.Content, ToolCallID: m.ToolCallID}
 		// Convert provider ToolCall to JSON-serializable toolCallJSON
 		for _, tc := range m.ToolCalls {
 			argsBytes, _ := json.Marshal(tc.Arguments)
+                        if tc.Name != "message" {
+                            log.Printf("Executing tool: %s with arguments: %+v\n", tc.Name, string(argsBytes))
+                        }
 			mj.ToolCalls = append(mj.ToolCalls, toolCallJSON{
 				ID:   tc.ID,
 				Type: "function",
@@ -134,6 +140,8 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []Message, tools []T
 		return LLMResponse{}, err
 	}
 
+	//fmt.Printf("BODY: %v", string(b))
+
 	url := fmt.Sprintf("%s/chat/completions", p.APIBase)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader(string(b)))
 	if err != nil {
@@ -163,6 +171,8 @@ func (p *OpenAIProvider) Chat(ctx context.Context, messages []Message, tools []T
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		return LLMResponse{}, err
 	}
+
+	//fmt.Printf("KEK RESPONSE: %+v\n", out)
 
 	if len(out.Choices) == 0 {
 		return LLMResponse{}, errors.New("OpenAI API returned no choices")

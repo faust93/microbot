@@ -29,11 +29,13 @@ type AgentLoop struct {
 	memory        *memory.MemoryStore
 	model         string
 	maxIterations int
+	temperature   float64
+	maxTokens     int
 	running       bool
 }
 
 // NewAgentLoop creates a new AgentLoop with the given provider.
-func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, maxIterations int, workspace string, scheduler *cron.Scheduler) *AgentLoop {
+func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, maxIterations int, Temperature float64, MaxTokens int, workspace string, scheduler *cron.Scheduler) *AgentLoop {
 	if model == "" {
 		model = provider.GetDefaultModel()
 	}
@@ -64,7 +66,7 @@ func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, max
 	}
 
 	sm := session.NewSessionManager(workspace)
-	ctx := NewContextBuilder(workspace, memory.NewLLMRanker(provider, model), 5)
+	ctx := NewContextBuilder(workspace, memory.NewLLMRanker(provider, model, 0.5, 32768), 5)
 	mem := memory.NewMemoryStoreWithWorkspace(workspace, 100)
 	// register memory tool (needs store instance)
 	reg.Register(tools.NewWriteMemoryTool(mem))
@@ -81,7 +83,7 @@ func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, max
 		tools.RegisterMCPFromConfig(reg, cfg)
 	}
 
-	return &AgentLoop{hub: b, provider: provider, tools: reg, sessions: sm, context: ctx, memory: mem, model: model, maxIterations: maxIterations}
+	return &AgentLoop{hub: b, provider: provider, tools: reg, sessions: sm, context: ctx, memory: mem, model: model, maxIterations: maxIterations, temperature: Temperature, maxTokens: MaxTokens}
 }
 
 // Run starts processing inbound messages. This is a blocking call until context is canceled.
@@ -152,7 +154,7 @@ func (a *AgentLoop) Run(ctx context.Context) {
 			toolDefs := a.tools.Definitions()
 			for iteration < a.maxIterations {
 				iteration++
-				resp, err := a.provider.Chat(ctx, messages, toolDefs, a.model)
+				resp, err := a.provider.Chat(ctx, messages, toolDefs, a.model, a.temperature, a.maxTokens)
 				if err != nil {
 					log.Printf("provider error: %v", err)
 					finalContent = "Sorry, I encountered an error while processing your request."
@@ -230,7 +232,7 @@ func (a *AgentLoop) ProcessDirect(content string, timeout time.Duration) (string
 	// Support tool calling iterations (similar to main loop)
 	var lastToolResult string
 	for iteration := 0; iteration < a.maxIterations; iteration++ {
-		resp, err := a.provider.Chat(ctx, messages, a.tools.Definitions(), a.model)
+		resp, err := a.provider.Chat(ctx, messages, a.tools.Definitions(), a.model, a.temperature, a.maxTokens)
 		if err != nil {
 			return "", err
 		}
