@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 )
 
 // MaxHistorySize is the maximum number of messages kept in a session.
@@ -13,10 +14,16 @@ import (
 // Important information should be persisted via write_memory, not session history.
 const MaxHistorySize = 50
 
+type Message struct {
+	Role      string `json:"role"` // "user", "assistant", "tool"
+	Content   string `json:"content"`
+	Timestamp string `json:"timestamp"` // RFC3339 format
+}
+
 // Session holds a short chat history.
 type Session struct {
 	Key     string
-	History []string
+	History []*Message
 }
 
 // SessionManager stores sessions in memory and persists to disk under workspace.
@@ -36,7 +43,7 @@ func (sm *SessionManager) GetOrCreate(key string) *Session {
 	if s, ok := sm.sessions[key]; ok {
 		return s
 	}
-	s := &Session{Key: key, History: make([]string, 0)}
+	s := &Session{Key: key, History: make([]*Message, 0)}
 	sm.sessions[key] = s
 	return s
 }
@@ -45,7 +52,7 @@ func (sm *SessionManager) Save(s *Session) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	// Trim history to the most recent messages
-	s.trim()
+	s.Trim()
 	path := filepath.Join(sm.workspace, "sessions")
 	os.MkdirAll(path, 0755)
 	fpath := filepath.Join(path, s.Key+".json")
@@ -82,17 +89,30 @@ func (sm *SessionManager) LoadAll() error {
 	return nil
 }
 
+func (sm *SessionManager) TrimAll() {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	for _, s := range sm.sessions {
+		s.Trim()
+	}
+}
+
 func (s *Session) AddMessage(role, content string) {
-	s.History = append(s.History, role+": "+content)
+	msg := &Message{
+		Role:      role,
+		Content:   content,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+	s.History = append(s.History, msg)
 }
 
 // GetHistory returns the session history.
-func (s *Session) GetHistory() []string {
+func (s *Session) GetHistory() []*Message {
 	return s.History
 }
 
 // trim keeps only the last MaxHistorySize messages, discarding the oldest.
-func (s *Session) trim() {
+func (s *Session) Trim() {
 	if len(s.History) > MaxHistorySize {
 		s.History = s.History[len(s.History)-MaxHistorySize:]
 	}

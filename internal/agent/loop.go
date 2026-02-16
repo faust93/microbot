@@ -66,6 +66,9 @@ func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, max
 	}
 
 	sm := session.NewSessionManager(workspace)
+	_ = sm.LoadAll() // best effort load existing sessions on startup
+	sm.TrimAll()     // trim all sessions to max history size on startup
+
 	ctx := NewContextBuilder(workspace, memory.NewLLMRanker(provider, model, 0.5, 32768), 5)
 	mem := memory.NewMemoryStoreWithWorkspace(workspace, 100)
 	// register memory tool (needs store instance)
