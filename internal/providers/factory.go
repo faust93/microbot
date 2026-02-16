@@ -8,7 +8,7 @@ import "github.com/local/picobot/internal/config"
 //   - else fallback to stub
 func NewProviderFromConfig(cfg config.Config) LLMProvider {
 	if cfg.Providers.OpenAI != nil && cfg.Providers.OpenAI.APIKey != "" {
-		return NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase)
+		return NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, cfg.Providers.OpenAI.Timeout)
 	}
 	return NewStubProvider()
 }

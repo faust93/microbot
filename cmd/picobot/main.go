@@ -69,7 +69,7 @@ func NewRootCmd() *cobra.Command {
 			cfg, _ := config.LoadConfig()
 			var provider providers.LLMProvider
 			if cfg.Providers.OpenAI != nil && cfg.Providers.OpenAI.APIKey != "" {
-				provider = providers.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase)
+				provider = providers.NewOpenAIProvider(cfg.Providers.OpenAI.APIKey, cfg.Providers.OpenAI.APIBase, cfg.Providers.OpenAI.Timeout)
 			} else {
 				provider = providers.NewStubProvider()
 			}
@@ -89,7 +89,7 @@ func NewRootCmd() *cobra.Command {
 			}
 			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Workspace, nil)
 
-			resp, err := ag.ProcessDirect(msg, 60*time.Second)
+			resp, err := ag.ProcessDirect(msg, time.Duration(cfg.Providers.OpenAI.Timeout)*time.Second)
 			if err != nil {
 				fmt.Fprintln(cmd.ErrOrStderr(), "error:", err)
 				return

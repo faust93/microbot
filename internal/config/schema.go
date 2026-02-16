@@ -38,6 +38,7 @@ type ProvidersConfig struct {
 type ProviderConfig struct {
 	APIKey  string `json:"apiKey"`
 	APIBase string `json:"apiBase"`
+	Timeout int    `json:"timeout"` // to prevent provider timeouts for long-running tool calls
 }
 
 type ToolsConfig struct {
@@ -45,8 +46,8 @@ type ToolsConfig struct {
 }
 
 type MCPConfig struct {
-	Enabled bool                          `json:"enabled"`
-	Servers map[string]MCPServerConfig   `json:"servers"`
+	Enabled bool                       `json:"enabled"`
+	Servers map[string]MCPServerConfig `json:"servers"`
 }
 
 type MCPServerConfig struct {
@@ -56,5 +57,3 @@ type MCPServerConfig struct {
 	URL       string            `json:"url,omitempty"`
 	Headers   map[string]string `json:"headers,omitempty"`
 }
-
-

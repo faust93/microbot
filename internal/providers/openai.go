@@ -19,7 +19,7 @@ type OpenAIProvider struct {
 	Client  *http.Client
 }
 
-func NewOpenAIProvider(apiKey, apiBase string) *OpenAIProvider {
+func NewOpenAIProvider(apiKey, apiBase string, timeout int) *OpenAIProvider {
 	if apiBase == "" {
 		apiBase = "https://api.openai.com/v1" // sensible default; can be overridden
 	}
@@ -27,7 +27,7 @@ func NewOpenAIProvider(apiKey, apiBase string) *OpenAIProvider {
 		APIKey:  apiKey,
 		APIBase: strings.TrimRight(apiBase, "/"),
 		Client: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: time.Duration(timeout) * time.Second,
 		},
 	}
 }
