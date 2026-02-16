@@ -21,7 +21,7 @@ func DefaultConfig() Config {
 			MaxToolIterations:  100,
 			HeartbeatIntervalS: 60,
 		}},
-		Channels: ChannelsConfig{Telegram: TelegramConfig{Enabled: false, Token: "", AllowFrom: []string{}}},
+		Channels: ChannelsConfig{Telegram: TelegramConfig{Enabled: false, Token: "", AllowFrom: []string{}}, Ntfy: NtfyConfig{Enabled: false, Token: "", Server: "https://ntfy.sh", Topic: ""}},
 		Providers: ProvidersConfig{
 			OpenAI: &ProviderConfig{APIKey: "sk-or-v1-REPLACE_ME", APIBase: "https://openrouter.ai/api/v1", Timeout: 180},
 		},

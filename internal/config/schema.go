@@ -23,12 +23,20 @@ type AgentDefaults struct {
 
 type ChannelsConfig struct {
 	Telegram TelegramConfig `json:"telegram"`
+	Ntfy     NtfyConfig     `json:"ntfy"`
 }
 
 type TelegramConfig struct {
 	Enabled   bool     `json:"enabled"`
 	Token     string   `json:"token"`
 	AllowFrom []string `json:"allowFrom"`
+}
+
+type NtfyConfig struct {
+	Enabled bool   `json:"enabled"`
+	Token   string `json:"token"`
+	Server  string `json:"server"`
+	Topic   string `json:"topic"`
 }
 
 type ProvidersConfig struct {

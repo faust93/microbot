@@ -20,8 +20,10 @@ func NewMessageTool(b *chat.Hub) *MessageTool {
 	return &MessageTool{hub: b}
 }
 
-func (m *MessageTool) Name() string        { return "message" }
-func (m *MessageTool) Description() string { return "Send a message to the current channel/chat" }
+func (m *MessageTool) Name() string { return "message" }
+func (m *MessageTool) Description() string {
+	return "Send a message to a channel/chat. Use this when you want to communicate something."
+}
 
 func (m *MessageTool) Parameters() map[string]interface{} {
 	return map[string]interface{}{
@@ -30,6 +32,15 @@ func (m *MessageTool) Parameters() map[string]interface{} {
 			"content": map[string]interface{}{
 				"type":        "string",
 				"description": "The message content to send",
+			},
+			"channel": map[string]interface{}{
+				"type":        "string",
+				"description": "The channel to send the message to",
+				"enum":        []string{"telegram", "ntfy"}, // TODO: dynamically populate based on registered channels
+			},
+			"chatID": map[string]interface{}{
+				"type":        "string",
+				"description": "The chat ID or topic to send the message to",
 			},
 		},
 		"required": []string{"content"},
@@ -57,12 +68,26 @@ func (m *MessageTool) Execute(ctx context.Context, args map[string]interface{}) 
 	if content == "" {
 		return "", fmt.Errorf("message tool: 'content' argument required")
 	}
+
+	channel := m.channel
+	chatID := m.chatID
+
+	if ch, ok := args["channel"].(string); ok && ch != "" {
+		channel = ch
+		if channel == "ntfy" {
+			chatID = "default"
+		}
+	}
+	if cid, ok := args["chatID"].(string); ok && cid != "" {
+		chatID = cid
+	}
 	// Publish outbound message to hub
 	out := chat.Outbound{
-		Channel: m.channel,
-		ChatID:  m.chatID,
+		Channel: channel,
+		ChatID:  chatID,
 		Content: content,
 	}
+
 	select {
 	case m.hub.Out <- out:
 		return "sent", nil

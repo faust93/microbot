@@ -27,13 +27,18 @@ type Outbound struct {
 type Hub struct {
 	In  chan Inbound
 	Out chan Outbound
+
+	TelegramOut chan Outbound
+	NtfyOut     chan Outbound
 }
 
 // NewHub constructs a new Hub with the given buffer size.
 func NewHub(buffer int) *Hub {
 	return &Hub{
-		In:  make(chan Inbound, buffer),
-		Out: make(chan Outbound, buffer),
+		In:          make(chan Inbound, buffer),
+		Out:         make(chan Outbound, buffer),
+		TelegramOut: make(chan Outbound, buffer),
+		NtfyOut:     make(chan Outbound, buffer),
 	}
 }
 
@@ -41,4 +46,6 @@ func NewHub(buffer int) *Hub {
 func (h *Hub) Close() {
 	close(h.In)
 	close(h.Out)
+	close(h.TelegramOut)
+	close(h.NtfyOut)
 }

@@ -151,10 +151,20 @@ func NewRootCmd() *cobra.Command {
 			}
 			heartbeat.StartHeartbeat(ctx, cfg.Agents.Defaults.Workspace, hbInterval, hub)
 
+			if err := channels.StartProxy(ctx, hub); err != nil {
+				log.Panicf("Failed to start proxy channel: %v\n", err)
+			}
+
 			// start telegram if enabled
 			if cfg.Channels.Telegram.Enabled {
 				if err := channels.StartTelegram(ctx, hub, cfg.Channels.Telegram.Token, cfg.Channels.Telegram.AllowFrom); err != nil {
 					fmt.Fprintf(os.Stderr, "failed to start telegram: %v\n", err)
+				}
+			}
+			// start ntfy if enabled
+			if cfg.Channels.Ntfy.Enabled {
+				if err := channels.StartNtfy(ctx, hub, cfg.Channels.Ntfy.Server, cfg.Channels.Ntfy.Token, cfg.Channels.Ntfy.Topic); err != nil {
+					fmt.Fprintf(os.Stderr, "failed to start ntfy: %v\n", err)
 				}
 			}
 

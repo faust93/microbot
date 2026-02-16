@@ -123,15 +123,12 @@ func StartTelegramWithBase(ctx context.Context, hub *chat.Hub, token, base strin
 			case <-ctx.Done():
 				log.Println("telegram: stopping outbound sender")
 				return
-			case out := <-hub.Out:
-				if out.Channel != "telegram" {
-					// ignore messages for other channels
-					continue
-				}
+			case out := <-hub.TelegramOut:
 				u := base + "/sendMessage"
 				v := url.Values{}
 				v.Set("chat_id", out.ChatID)
 				v.Set("text", out.Content)
+				//v.Set("parse_mode", "MarkdownV2")
 				resp, err := client.PostForm(u, v)
 				if err != nil {
 					log.Printf("telegram sendMessage error: %v", err)
