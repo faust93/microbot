@@ -11,6 +11,7 @@ import (
 	"github.com/local/picobot/internal/agent/memory"
 	"github.com/local/picobot/internal/agent/tools"
 	"github.com/local/picobot/internal/chat"
+	cfgpkg "github.com/local/picobot/internal/config"
 	"github.com/local/picobot/internal/cron"
 	"github.com/local/picobot/internal/providers"
 	"github.com/local/picobot/internal/session"
@@ -74,6 +75,11 @@ func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, max
 	reg.Register(tools.NewListSkillsTool(skillMgr))
 	reg.Register(tools.NewReadSkillTool(skillMgr))
 	reg.Register(tools.NewDeleteSkillTool(skillMgr))
+
+	// register MCP tools from config (if present)
+	if cfg, err := cfgpkg.LoadConfig(); err == nil {
+		tools.RegisterMCPFromConfig(reg, cfg)
+	}
 
 	return &AgentLoop{hub: b, provider: provider, tools: reg, sessions: sm, context: ctx, memory: mem, model: model, maxIterations: maxIterations}
 }

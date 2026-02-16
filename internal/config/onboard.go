@@ -25,6 +25,25 @@ func DefaultConfig() Config {
 		Providers: ProvidersConfig{
 			OpenAI: &ProviderConfig{APIKey: "sk-or-v1-REPLACE_ME", APIBase: "https://openrouter.ai/api/v1"},
 		},
+		Tools: ToolsConfig{
+			MCP: &MCPConfig{
+				Enabled: false,
+				Servers: map[string]MCPServerConfig{
+					// Example: local MCP server via stdio
+					 "local_calc": {
+						Transport: "stdio",
+						Command:   "python",
+						Args:      []string{"~/.bot/mcp/servers/calculator.py"},
+					 },
+					// Example: remote MCP server via HTTP
+					 "remote_server": {
+						Transport: "http",
+						URL:       "https://mcp.example.com/mcp",
+						Headers:   map[string]string{"Authorization": "Bearer token"},
+					 },
+				},
+			},
+		},
 	}
 }
 
