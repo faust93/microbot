@@ -152,9 +152,12 @@ func (m *mcpRemoteTool) Execute(ctx context.Context, args map[string]interface{}
 	req.Params.Name = m.toolName
 	req.Params.Arguments = args
 
-	res, err := m.client.CallTool(ctx, req)
+	mcp_ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	res, err := m.client.CallTool(mcp_ctx, req)
 	if err != nil {
-		return "", err
+		return "Tool call failed:", err
 	}
 	// return formatted result
 	return fmt.Sprintf("%v", res), nil
