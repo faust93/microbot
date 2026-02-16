@@ -14,6 +14,14 @@
 
 ---
 
+> https://github.com/louisho5/picobot.git with additional features and fixes
+
+- MCP tools calling support
+- NTFY channel
+- Bunch of fixes and improvements (context, sessions etc)
+
+---
+
 Love the idea of open-source AI agents like [OpenClaw](https://github.com/openclaw/openclaw) but tired of the bloat? **Picobot** gives you the same power — persistent memory, tool calling, skills, Telegram integration — in a single ~8MB binary that boots in milliseconds.
 
 No Python. No Node. No 500MB container. Just one Go binary and a config file.
