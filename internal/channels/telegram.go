@@ -9,9 +9,15 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/local/picobot/internal/chat"
+)
+
+var (
+	typingStops = make(map[string]chan struct{})
+	typingMutex sync.Mutex
 )
 
 // StartTelegram is a convenience wrapper that uses the real polling implementation
@@ -41,6 +47,20 @@ func StartTelegramWithBase(ctx context.Context, hub *chat.Hub, token, base strin
 
 	client := &http.Client{Timeout: 45 * time.Second}
 
+	sendTyping := func(chatID string) {
+		u := base + "/sendChatAction"
+		v := url.Values{}
+		v.Set("chat_id", chatID)
+		v.Set("action", "typing")
+		resp, err := client.PostForm(u, v)
+		if err != nil {
+			log.Printf("telegram sendTyping error: %v", err)
+		} else {
+			io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
+	}
+
 	// inbound polling goroutine
 	go func() {
 		offset := int64(0)
@@ -48,6 +68,13 @@ func StartTelegramWithBase(ctx context.Context, hub *chat.Hub, token, base strin
 			select {
 			case <-ctx.Done():
 				log.Println("telegram: stopping inbound polling")
+				// Stop all typing indicators
+				typingMutex.Lock()
+				for _, stopCh := range typingStops {
+					close(stopCh)
+				}
+				typingStops = make(map[string]chan struct{}) // clear map
+				typingMutex.Unlock()
 				return
 			default:
 			}
@@ -111,6 +138,25 @@ func StartTelegramWithBase(ctx context.Context, hub *chat.Hub, token, base strin
 					Content:   m.Text,
 					Timestamp: time.Now(),
 				}
+				// Start typing indicator
+				typingMutex.Lock()
+				if _, exists := typingStops[chatID]; !exists {
+					stopCh := make(chan struct{})
+					typingStops[chatID] = stopCh
+					go func() {
+						ticker := time.NewTicker(5 * time.Second)
+						defer ticker.Stop()
+						for {
+							select {
+							case <-stopCh:
+								return
+							case <-ticker.C:
+								sendTyping(chatID)
+							}
+						}
+					}()
+				}
+				typingMutex.Unlock()
 			}
 		}
 	}()
@@ -122,8 +168,22 @@ func StartTelegramWithBase(ctx context.Context, hub *chat.Hub, token, base strin
 			select {
 			case <-ctx.Done():
 				log.Println("telegram: stopping outbound sender")
+				// Stop all typing indicators
+				typingMutex.Lock()
+				for _, stopCh := range typingStops {
+					close(stopCh)
+				}
+				typingStops = make(map[string]chan struct{}) // clear map
+				typingMutex.Unlock()
 				return
 			case out := <-hub.TelegramOut:
+				// Stop typing indicator
+				typingMutex.Lock()
+				if stopCh, exists := typingStops[out.ChatID]; exists {
+					close(stopCh)
+					delete(typingStops, out.ChatID)
+				}
+				typingMutex.Unlock()
 				u := base + "/sendMessage"
 				v := url.Values{}
 				v.Set("chat_id", out.ChatID)
