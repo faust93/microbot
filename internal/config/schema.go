@@ -5,6 +5,7 @@ type Config struct {
 	Agents    AgentsConfig    `json:"agents"`
 	Channels  ChannelsConfig  `json:"channels"`
 	Providers ProvidersConfig `json:"providers"`
+	Memory    MemoryConfig    `json:"memory"`
 	Tools     ToolsConfig     `json:"tools"`
 }
 
@@ -64,4 +65,14 @@ type MCPServerConfig struct {
 	Args      []string          `json:"args,omitempty"`
 	URL       string            `json:"url,omitempty"`
 	Headers   map[string]string `json:"headers,omitempty"`
+}
+
+type MemoryConfig struct {
+	Enabled           bool    `json:"enabled"`
+	EmbedType         string  `json:"embedType"`                   // e.g., "onnx"
+	DbPath            string  `json:"dbPath,omitempty"`            // path to SQLite db file (if using SQLite-backed memory)
+	ONNXModelPath     string  `json:"onnxModelPath,omitempty"`     // path to ONNX model file (if EmbedType is "onnx")
+	ONNXTokenizerPath string  `json:"onnxTokenizerPath,omitempty"` // path to tokenizer file (if needed by the ONNX model)
+	Threshold         float32 `json:"threshold,omitempty"`         // number of similar items to retrieve in QueryHistory
+	TopK              int     `json:"topK,omitempty"`              // max number of items to return in QueryHistory
 }

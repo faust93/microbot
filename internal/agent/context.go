@@ -17,17 +17,15 @@ import (
 // ContextBuilder builds messages for the LLM from session history and current message.
 type ContextBuilder struct {
 	workspace    string
-	ranker       memory.Ranker
-	topK         int
 	skillsLoader *skills.Loader
+	memPersist   *memory.MemoryPersist
 }
 
-func NewContextBuilder(workspace string, r memory.Ranker, topK int) *ContextBuilder {
+func NewContextBuilder(workspace string, memPersist *memory.MemoryPersist) *ContextBuilder {
 	return &ContextBuilder{
 		workspace:    workspace,
-		ranker:       r,
-		topK:         topK,
 		skillsLoader: skills.NewLoader(workspace),
+		memPersist:   memPersist,
 	}
 }
 
@@ -98,16 +96,12 @@ Chat ID: %s
 		system = system + "Memory:\n" + memoryContext
 	}
 
-	// select top-K memories using ranker if available
 	selected := memories
-	if cb.ranker != nil && len(memories) > 0 {
-		selected = cb.ranker.Rank(currentMessage, memories, cb.topK)
-	}
 	if len(selected) > 0 {
 		var sb strings.Builder
-		sb.WriteString("Relevant memories:\n")
+		sb.WriteString("# Related past conversations:\n")
 		for _, m := range selected {
-			sb.WriteString(fmt.Sprintf("- %s (%s)\n", m.Text, m.Kind))
+			sb.WriteString(fmt.Sprintf("- %s (%s, %s, similarity=%.4f)\n", m.Text, m.Role, m.Timestamp, m.Similarity))
 		}
 		system = system + sb.String()
 	}
@@ -123,5 +117,14 @@ Chat ID: %s
 
 	// current
 	msgs = append(msgs, providers.Message{Role: "user", Content: currentMessage})
+
+	/*
+		jsonData, err := json.MarshalIndent(msgs, "", "  ")
+		if err != nil {
+			log.Fatalf("Error marshalling JSON: %v", err)
+		}
+		fmt.Println(string(jsonData))
+	*/
+
 	return msgs
 }

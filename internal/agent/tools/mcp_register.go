@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	cfgpkg "github.com/local/picobot/internal/config"
+	"github.com/local/picobot/internal/config"
 	mcpclient "github.com/mark3labs/mcp-go/client"
 	transport "github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -19,12 +19,12 @@ import (
 // RegisterMCPFromConfig inspects the config and registers MCP-based remote tools
 // into the provided registry. Each server's tools are registered with names
 // prefixed by "mcp.<server>.<tool>".
-func RegisterMCPFromConfig(reg *Registry, cfg cfgpkg.Config) {
-	if cfg.Tools.MCP == nil || !cfg.Tools.MCP.Enabled {
+func RegisterMCPFromConfig(reg *Registry, cfg *config.ToolsConfig) {
+	if cfg.MCP == nil || !cfg.MCP.Enabled {
 		return
 	}
 
-	for srvName, srv := range cfg.Tools.MCP.Servers {
+	for srvName, srv := range cfg.MCP.Servers {
 		// build transport
 		var tr transport.Interface
 		switch strings.ToLower(srv.Transport) {

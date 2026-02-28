@@ -11,7 +11,7 @@ import (
 	"github.com/local/picobot/internal/agent/memory"
 	"github.com/local/picobot/internal/agent/tools"
 	"github.com/local/picobot/internal/chat"
-	cfgpkg "github.com/local/picobot/internal/config"
+	"github.com/local/picobot/internal/config"
 	"github.com/local/picobot/internal/cron"
 	"github.com/local/picobot/internal/providers"
 	"github.com/local/picobot/internal/session"
@@ -27,6 +27,7 @@ type AgentLoop struct {
 	sessions      *session.SessionManager
 	context       *ContextBuilder
 	memory        *memory.MemoryStore
+	memoryPersist *memory.MemoryPersist
 	model         string
 	maxIterations int
 	temperature   float64
@@ -35,7 +36,7 @@ type AgentLoop struct {
 }
 
 // NewAgentLoop creates a new AgentLoop with the given provider.
-func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, maxIterations int, Temperature float64, MaxTokens int, workspace string, scheduler *cron.Scheduler) *AgentLoop {
+func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, maxIterations int, Temperature float64, MaxTokens int, workspace string, scheduler *cron.Scheduler, toolsConfig *config.ToolsConfig, memoryConfig *config.MemoryConfig) *AgentLoop {
 	if model == "" {
 		model = provider.GetDefaultModel()
 	}
@@ -67,9 +68,19 @@ func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, max
 
 	sm := session.NewSessionManager(workspace)
 	_ = sm.LoadAll() // best effort load existing sessions on startup
-	sm.TrimAll()     // trim all sessions to max history size on startup
 
-	ctx := NewContextBuilder(workspace, memory.NewLLMRanker(provider, model, 0.5, 32768), 5)
+	memPersist := (*memory.MemoryPersist)(nil)
+	if memoryConfig != nil && memoryConfig.Enabled {
+
+		memPersist = memory.NewPersistMemory(memoryConfig)
+		if memPersist == nil {
+			log.Fatalf("failed to initialize memory system with config: %+v", memoryConfig)
+		}
+
+		log.Printf("Persistent memory store initialized with %s embedder", memoryConfig.EmbedType)
+	}
+
+	ctx := NewContextBuilder(workspace, memPersist)
 	mem := memory.NewMemoryStoreWithWorkspace(workspace, 100)
 	// register memory tool (needs store instance)
 	reg.Register(tools.NewWriteMemoryTool(mem))
@@ -81,12 +92,9 @@ func NewAgentLoop(b *chat.Hub, provider providers.LLMProvider, model string, max
 	reg.Register(tools.NewReadSkillTool(skillMgr))
 	reg.Register(tools.NewDeleteSkillTool(skillMgr))
 
-	// register MCP tools from config (if present)
-	if cfg, err := cfgpkg.LoadConfig(); err == nil {
-		tools.RegisterMCPFromConfig(reg, cfg)
-	}
+	tools.RegisterMCPFromConfig(reg, toolsConfig)
 
-	return &AgentLoop{hub: b, provider: provider, tools: reg, sessions: sm, context: ctx, memory: mem, model: model, maxIterations: maxIterations, temperature: Temperature, maxTokens: MaxTokens}
+	return &AgentLoop{hub: b, provider: provider, tools: reg, sessions: sm, context: ctx, memory: mem, memoryPersist: memPersist, model: model, maxIterations: maxIterations, temperature: Temperature, maxTokens: MaxTokens}
 }
 
 // Run starts processing inbound messages. This is a blocking call until context is canceled.
@@ -148,7 +156,27 @@ func (a *AgentLoop) Run(ctx context.Context) {
 			session := a.sessions.GetOrCreate(msg.Channel + ":" + msg.ChatID)
 			// get file-backed memory context (long-term + today)
 			memCtx, _ := a.memory.GetMemoryContext()
-			memories := a.memory.Recent(5)
+			// query persistent memory for relevant items
+			memories := []memory.MemoryItem{}
+			if a.memoryPersist != nil {
+				memx, err := a.memoryPersist.QueryHistory(msg.Channel+msg.ChatID, msg.Content, 0)
+				if err != nil {
+					log.Printf("Failed to query persistent memory: %v", err)
+				} else {
+					//log.Printf("Memory query returned %d items:\n", len(memx))
+					for i, m := range memx {
+						log.Printf("Result[%d] Similarity: %.4f Role: %s Content: %q\n\n", i, m.Similarity, m.Role, m.Text)
+						memories = append(memories, memory.MemoryItem{
+							Role:       m.Role,
+							Text:       m.Text,
+							Timestamp:  m.Timestamp,
+							Similarity: m.Similarity,
+							Kind:       "Persistent",
+						})
+					}
+				}
+			}
+
 			messages := a.context.BuildMessages(session.GetHistory(), msg.Content, msg.Channel, msg.ChatID, memCtx, memories)
 
 			iteration := 0
@@ -193,6 +221,23 @@ func (a *AgentLoop) Run(ctx context.Context) {
 			// Save session
 			session.AddMessage("user", msg.Content)
 			session.AddMessage("assistant", finalContent)
+
+			// save trimmed history to persistent memory before saving session, to avoid blowing up session file size and LLM context window.
+			// This means trimmed messages won't be in session history but will be in memory history if memory is enabled.
+			if a.memoryPersist != nil {
+				msgs := a.sessions.TrimAll()
+				for _, m := range msgs {
+					if m.Role != "user" {
+						//log.Printf("Storing trimmed history to memory: Role: %s Content: %q\n", m.Role, m.Content)
+						err := a.memoryPersist.StoreHistory(msg.Channel+msg.ChatID, m.Role, m.Content, m.Timestamp)
+						if err != nil {
+							log.Printf("Failed to store trimmed history: %v", err)
+						}
+					}
+				}
+			} else {
+				_ = a.sessions.TrimAll()
+			}
 			a.sessions.Save(session)
 
 			out := chat.Outbound{Channel: msg.Channel, ChatID: msg.ChatID, Content: finalContent}
@@ -229,7 +274,7 @@ func (a *AgentLoop) ProcessDirect(content string, timeout time.Duration) (string
 
 	// Build full context (bootstrap files, skills, memory) just like the main loop
 	memCtx, _ := a.memory.GetMemoryContext()
-	memories := a.memory.Recent(5)
+	memories := []memory.MemoryItem{} //a.memory.Recent(5)
 	messages := a.context.BuildMessages(nil, content, "cli", "direct", memCtx, memories)
 
 	// Support tool calling iterations (similar to main loop)

@@ -9,8 +9,7 @@ import (
 )
 
 // MaxHistorySize is the maximum number of messages kept in a session.
-// Older messages are trimmed on save to keep the session file small
-// and avoid blowing up the LLM context window.
+// Older messages are trimmed and saved to persistent memory. This keeps the in-memory session small and focused on recent context.
 // Important information should be persisted via write_memory, not session history.
 const MaxHistorySize = 50
 
@@ -89,12 +88,17 @@ func (sm *SessionManager) LoadAll() error {
 	return nil
 }
 
-func (sm *SessionManager) TrimAll() {
+func (sm *SessionManager) TrimAll() []*Message {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+	var trimmedMsg []*Message
 	for _, s := range sm.sessions {
-		s.Trim()
+		trimmed := s.Trim()
+		if len(trimmed) > 0 {
+			trimmedMsg = append(trimmedMsg, trimmed...)
+		}
 	}
+	return trimmedMsg
 }
 
 func (s *Session) AddMessage(role, content string) {
@@ -112,8 +116,11 @@ func (s *Session) GetHistory() []*Message {
 }
 
 // trim keeps only the last MaxHistorySize messages, discarding the oldest.
-func (s *Session) Trim() {
+func (s *Session) Trim() []*Message {
 	if len(s.History) > MaxHistorySize {
+		trimmed := s.History[:len(s.History)-MaxHistorySize]
 		s.History = s.History[len(s.History)-MaxHistorySize:]
+		return trimmed
 	}
+	return nil
 }

@@ -12,9 +12,11 @@ import (
 // MemoryItem is a stored memory entry.
 // Kind is "short" or "long". Timestamp is in UTC.
 type MemoryItem struct {
-	Kind      string
-	Text      string
-	Timestamp time.Time
+	Kind       string
+	Role       string
+	Text       string
+	Similarity float64
+	Timestamp  string
 }
 
 // MemoryStore is a minimal in-memory memory system with simple query capabilities.
@@ -25,8 +27,6 @@ type MemoryStore struct {
 	workspace string // workspace root (used for disk-backed memory)
 	memoryDir string // workspace/memory/
 	limit     int    // max short-term items to keep
-	long      []MemoryItem
-	short     []MemoryItem
 	mu        sync.RWMutex
 }
 
@@ -44,78 +44,11 @@ func NewMemoryStoreWithWorkspace(workspace string, limit int) *MemoryStore {
 	ms := &MemoryStore{
 		workspace: workspace,
 		memoryDir: workspace + "/memory",
-		short:     make([]MemoryItem, 0, limit),
-		long:      make([]MemoryItem, 0),
 		limit:     limit,
 	}
 	// ensure memory directory exists
 	_ = os.MkdirAll(ms.memoryDir, 0o755)
 	return ms
-}
-
-// AddShort adds a short-term memory entry.
-func (s *MemoryStore) AddShort(text string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	it := MemoryItem{Timestamp: time.Now().UTC(), Text: text, Kind: "short"}
-	s.short = append(s.short, it)
-	// drop oldest if over limit
-	if len(s.short) > s.limit {
-		s.short = s.short[len(s.short)-s.limit:]
-	}
-}
-
-// AddLong adds a long-term memory entry.
-func (s *MemoryStore) AddLong(text string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	it := MemoryItem{Timestamp: time.Now().UTC(), Text: text, Kind: "long"}
-	s.long = append(s.long, it)
-}
-
-// Recent returns up to n most recent memory items, combining short and long (short first).
-// Items are returned in most-recent-first order.
-func (s *MemoryStore) Recent(n int) []MemoryItem {
-	if n <= 0 {
-		return nil
-	}
-	out := make([]MemoryItem, 0, n)
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	// take from short (newest first)
-	for i := len(s.short) - 1; i >= 0 && len(out) < n; i-- {
-		out = append(out, s.short[i])
-	}
-	// then from long (newest first)
-	for i := len(s.long) - 1; i >= 0 && len(out) < n; i-- {
-		out = append(out, s.long[i])
-	}
-	return out
-}
-
-// QueryByKeyword returns up to n items containing the keyword (case-insensitive) in most-recent-first order.
-// Preference follows Recent ordering: short (newest first) then long (newest first).
-func (s *MemoryStore) QueryByKeyword(keyword string, n int) []MemoryItem {
-	if n <= 0 || keyword == "" {
-		return nil
-	}
-	k := strings.ToLower(keyword)
-	out := make([]MemoryItem, 0, n)
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	// scan short (newest first)
-	for i := len(s.short) - 1; i >= 0 && len(out) < n; i-- {
-		if strings.Contains(strings.ToLower(s.short[i].Text), k) {
-			out = append(out, s.short[i])
-		}
-	}
-	// then long (newest first)
-	for i := len(s.long) - 1; i >= 0 && len(out) < n; i-- {
-		if strings.Contains(strings.ToLower(s.long[i].Text), k) {
-			out = append(out, s.long[i])
-		}
-	}
-	return out
 }
 
 // ReadLongTerm reads the long-term MEMORY.md file under workspace/memory/MEMORY.md

@@ -25,6 +25,15 @@ func DefaultConfig() Config {
 		Providers: ProvidersConfig{
 			OpenAI: &ProviderConfig{APIKey: "sk-or-v1-REPLACE_ME", APIBase: "https://openrouter.ai/api/v1", Timeout: 180},
 		},
+		Memory: MemoryConfig{
+			Enabled:           false,
+			EmbedType:         "onnx",
+			DbPath:            "~/.picobot/memory.db",
+			Threshold:         0.89,
+			TopK:              10,
+			ONNXModelPath:     "~/.picobot/embeddings/model.onnx",
+			ONNXTokenizerPath: "~/.picobot/embeddings/tokenizer.json",
+		},
 		Tools: ToolsConfig{
 			MCP: &MCPConfig{
 				Enabled: false,

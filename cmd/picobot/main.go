@@ -87,7 +87,7 @@ func NewRootCmd() *cobra.Command {
 			if maxIter <= 0 {
 				maxIter = 100
 			}
-			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Temperature, cfg.Agents.Defaults.MaxTokens, cfg.Agents.Defaults.Workspace, nil)
+			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Temperature, cfg.Agents.Defaults.MaxTokens, cfg.Agents.Defaults.Workspace, nil, &cfg.Tools, &cfg.Memory)
 
 			resp, err := ag.ProcessDirect(msg, time.Duration(cfg.Providers.OpenAI.Timeout)*time.Second)
 			if err != nil {
@@ -134,7 +134,7 @@ func NewRootCmd() *cobra.Command {
 			if maxIter <= 0 {
 				maxIter = 100
 			}
-			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Temperature, cfg.Agents.Defaults.MaxTokens, cfg.Agents.Defaults.Workspace, scheduler)
+			ag := agent.NewAgentLoop(hub, provider, model, maxIter, cfg.Agents.Defaults.Temperature, cfg.Agents.Defaults.MaxTokens, cfg.Agents.Defaults.Workspace, scheduler, &cfg.Tools, &cfg.Memory)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
@@ -330,7 +330,6 @@ func NewRootCmd() *cobra.Command {
 				return
 			}
 			top, _ := cmd.Flags().GetInt("top")
-			verbose, _ := cmd.Flags().GetBool("verbose")
 			cfg, _ := config.LoadConfig()
 			ws := cfg.Agents.Defaults.Workspace
 			if ws == "" {
@@ -365,21 +364,23 @@ func NewRootCmd() *cobra.Command {
 					items = append(items, memory.MemoryItem{Kind: "long", Text: line})
 				}
 			}
-			provider := providers.NewProviderFromConfig(cfg)
-			var logger *log.Logger
-			if verbose {
-				logger = log.New(cmd.OutOrStdout(), "ranker: ", 0)
+
+			memPersist := memory.NewPersistMemory(&cfg.Memory)
+			if memPersist == nil {
+				log.Fatalf("failed to initialize memory system with config: %+v", cfg.Memory)
 			}
-			ranker := memory.NewLLMRankerWithLogger(provider, provider.GetDefaultModel(), 0.5, 32768, logger)
-			res := ranker.Rank(q, items, top)
-			for i, m := range res {
-				fmt.Fprintf(cmd.OutOrStdout(), "%d: %s (%s)\n", i+1, m.Text, m.Kind)
+			memx, err := memPersist.QueryHistory("", q, top)
+			if err != nil {
+				log.Printf("Failed to query memory: %v", err)
+			} else {
+				for i, m := range memx {
+					log.Printf("Result[%d] Similarity: %.4f Role: %s Content: %q\n\n", i, m.Similarity, m.Role, m.Text)
+				}
 			}
 		},
 	}
 	rankCmd.Flags().StringP("query", "q", "", "Query to rank memories against")
 	rankCmd.Flags().IntP("top", "k", 5, "Number of top memories to show")
-	rankCmd.Flags().BoolP("verbose", "v", false, "Enable verbose diagnostic logging (to stdout)")
 	memoryCmd.AddCommand(rankCmd)
 
 	rootCmd.AddCommand(memoryCmd)
